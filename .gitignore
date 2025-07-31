@@ -1,0 +1,7 @@
+.env
+venv
+songs.json
+playlists.json
+auth.json
+songs.txt
+oauth.json
