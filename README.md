@@ -8,27 +8,15 @@ This is purely for my own use and is only tested on a couple of playlists.
 
 ## How to use
 
-Create youtube api credentials in google console. Refer to https://ytmusicapi.readthedocs.io/en/stable/setup/oauth.html for tips
-
-Once you have client id and secret:
-
-```
-cp .env-template .env
-
-```
-
-Then copy paste id and secret into the appropriate placeholders
-
-
 Install requirements:
 ```
 pip install -r requirements.txt
 ```
 
-Authenticate yourself in google youtube. This should create you an auth.json file (cookie). You will need client id/secret from the step above.
+Authenticate yourself in google youtube. This should create you a browser.json file (cookie).
 
 ```
-ytmusicapi auth
+ytmusicapi browser
 ```
 
 
@@ -39,23 +27,16 @@ python spotify-backup.py playlists.json --dump=liked,playlists --format=json
 
 ```
 
-Output should be in playlists.json file. 
-Now extract songs from Liked Songs into a simplified version. It will take playlists.json and create 2 files, songs.json and songs.txt (same content). For any other playlist, modify the script.
+Output should be in playlists.json file.
 
-```
-python spotify-playlist-simplified.py
-```
-
-With songs.json file created and containing list of songs of interest, run
-
-test if it finds songs:
+Test if it finds songs:
 
 ```
 python ytmusic_add.py --dry-run 
 ```
 
 
-interactively add each song (select which result to add):
+Interactively add each song (select which result to add):
 
 ```
 python ytmusic_add.py --add
