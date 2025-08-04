@@ -156,12 +156,12 @@ def add_individual_songs(ytmusic, playlist_id, video_ids):
             except Exception as e:
                 print(f"⚠️ Exception adding {video_id} (attempt {attempt}): {str(e)}")
             
-            time.sleep(5)
+            time.sleep(0.5)
         
         if not success:
             print(f"❌ Failed to add song after 3 attempts: {video_id}")
     
-    print(f"Added {added}/{len(chunk)} songs")
+    print(f"Added {added}/{len(video_ids)} songs")
     return added
 
 
