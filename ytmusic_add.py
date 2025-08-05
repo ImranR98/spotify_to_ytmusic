@@ -4,6 +4,7 @@ import time
 import logging
 from ytmusicapi import YTMusic, OAuthCredentials
 from dotenv import dotenv_values
+import difflib
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,18 +24,79 @@ def spotify_track_to_song(track):
         "artists": [artist["name"] for artist in track["artists"]]
     }
 
-
-def search_song(ytmusic, song):
+def search_song(ytmusic, song, limit=5):
     query = f"{song['title']} {', '.join(song['artists'])}"
-    results = ytmusic.search(query, filter="songs", limit=5)
-    return results
+    resultsS = ytmusic.search(query, filter="songs")[:limit]
+    resultsV = ytmusic.search(query, filter="videos")[:limit]
+    
+    # Precompute lowercase versions for case-insensitive matching
+    original_title = song['title'].lower()
+    original_artists = ', '.join(song['artists']).lower()
+    
+    # Calculate Jaccard similarity for better partial matching
+    def jaccard_sim(a, b):
+        set_a = set(a.split())
+        set_b = set(b.split())
+        intersection = set_a & set_b
+        union = set_a | set_b
+        return len(intersection) / len(union) if union else 0
+
+    def calculate_similarity(item):
+        if not item:
+            return -1  # Invalid item score
+            
+        title = item['title'].lower()
+        artists = ', '.join([a['name'] for a in item.get('artists', [])]).lower()
+        
+        # Calculate individual similarity components
+        title_sim = jaccard_sim(original_title, title)
+        artist_sim = jaccard_sim(original_artists, artists)
+        full_string_sim = difflib.SequenceMatcher(
+            None, 
+            f"{original_title} {original_artists}",
+            f"{title} {artists}"
+        ).ratio()
+        
+        # Weighted combination (prioritize title and artist matches)
+        return 0.4 * title_sim + 0.4 * artist_sim + 0.2 * full_string_sim
+
+    merged_results = []
+    max_length = max(len(resultsS), len(resultsV))
+    
+    for i in range(max_length):
+        song_item = resultsS[i] if i < len(resultsS) else None
+        video_item = resultsV[i] if i < len(resultsV) else None
+        
+        if song_item and video_item:
+            # Calculate weighted similarity scores
+            song_sim = calculate_similarity(song_item)
+            video_sim = calculate_similarity(video_item)
+            
+            # Place more relevant item first
+            if song_sim >= video_sim:
+                merged_results.append(song_item)
+                merged_results.append(video_item)
+            else:
+                merged_results.append(video_item)
+                merged_results.append(song_item)
+                
+        elif song_item:
+            merged_results.append(song_item)
+        elif video_item:
+            merged_results.append(video_item)
+            
+    return merged_results
 
 
 def print_results(results):
     for i, r in enumerate(results):
         title = r.get("title")
         artists = ", ".join([a["name"] for a in r.get("artists", [])])
-        album = r.get("album", {}).get("name", "Unknown Album")
+        album_info = r.get("album")
+        if album_info is None:
+            album = "Unknown Album"
+        else:
+            album = album_info.get("name", "Unknown Album")
         duration = r.get("duration", "Unknown")
         print(f"[{i}] {title} – {artists} | Album: {album} | Duration: {duration}")
 
@@ -115,7 +177,7 @@ def dry_run_tracks(ytmusic, tracks):
 
 
 def create_yt_playlist(ytmusic, name, description, video_ids):
-    playlist_name = f"{name} (from Spotify)"
+    playlist_name = f"{name} (Spotify import)"
     total_songs = len(video_ids)
     
     try:
@@ -145,14 +207,10 @@ def add_individual_songs(ytmusic, playlist_id, video_ids):
         for attempt in range(1, 4):
             try:
                 response = ytmusic.add_playlist_items(playlist_id, [video_id])
-                
-                if response and response[0]['status'] == 'STATUS_SUCCEEDED':
-                    added += 1
-                    success = True
-                    print(f"✅ Added song: {video_id} (attempt {attempt})")
-                    break
-                else:
-                    print(f"⚠️ Failed to add {video_id} (attempt {attempt}): {response}")
+                added += 1
+                success = True
+                print(f"✅ Added song: {video_id} (attempt {attempt})")
+                break
             except Exception as e:
                 print(f"⚠️ Exception adding {video_id} (attempt {attempt}): {str(e)}")
             
